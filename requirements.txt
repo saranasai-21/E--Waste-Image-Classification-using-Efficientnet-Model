@@ -1,5 +1,5 @@
-gradio
-tensorflow-cpu
-numpy
-pillow
-h5py
+tensorflow==2.16.1
+keras==3.3.3
+gradio==4.44.1
+numpy==1.26.4
+h5py==3.11.0
