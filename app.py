@@ -32,7 +32,7 @@ CLASS_NAMES = [
 # =========================
 # LOAD MODEL
 # =========================
-MODEL_PATH = "best_model.keras"
+MODEL_PATH = "ewaste_efficientnetv2b2.keras"
 
 model = keras.models.load_model(
     MODEL_PATH,
