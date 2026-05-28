@@ -4,15 +4,11 @@ import numpy as np
 from tensorflow.keras.models import load_model
 
 # =====================================================
-# Load Model
+# Load Original Model
 # =====================================================
 
-# IMPORTANT:
-# Use the CLEAN deployment model
-# NOT the original training model
-
 model = load_model(
-    "ewaste_deployment.keras",
+    "ewaste_efficientnetv2b2.keras",
     compile=False,
     safe_mode=False
 )
@@ -45,16 +41,16 @@ def predict_image(image):
     if image is None:
         return {"Please Upload an Image": 1.0}
 
-    # Convert to RGB
+    # Convert image to RGB
     image = image.convert("RGB")
 
-    # Resize
+    # Resize image
     image = image.resize((IMG_SIZE, IMG_SIZE))
 
     # Convert to numpy
     image = np.array(image).astype("float32")
 
-    # Expand dims
+    # Expand dimensions
     image = np.expand_dims(image, axis=0)
 
     # Preprocess
@@ -63,7 +59,7 @@ def predict_image(image):
     # Predict
     predictions = model.predict(image, verbose=0)[0]
 
-    # Convert to dictionary
+    # Convert predictions to dictionary
     confidences = {
         class_names[i]: float(predictions[i])
         for i in range(len(class_names))
@@ -223,9 +219,7 @@ with gr.Blocks(
 
     with gr.Row(equal_height=True):
 
-        # =============================================
         # Upload Section
-        # =============================================
 
         with gr.Column(scale=1):
 
@@ -252,9 +246,7 @@ with gr.Blocks(
                     container=False
                 )
 
-        # =============================================
         # Prediction Results
-        # =============================================
 
         with gr.Column(scale=1):
 
@@ -326,4 +318,7 @@ with gr.Blocks(
 # Launch
 # =====================================================
 
-demo.launch(server_name="0.0.0.0", server_port=7860)
+demo.launch(
+    server_name="0.0.0.0",
+    server_port=7860
+)
