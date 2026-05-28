@@ -1,14 +1,24 @@
+# =====================================================
+# Imports
+# =====================================================
+
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import gradio as gr
 import tensorflow as tf
 import numpy as np
+
+from keras.models import load_model
 
 # =====================================================
 # Load Model
 # =====================================================
 
-model = tf.keras.models.load_model(
+model = load_model(
     "ewaste_efficientnetv2b2.keras",
-    compile=False
+    compile=False,
+    safe_mode=False
 )
 
 # =====================================================
@@ -36,61 +46,60 @@ IMG_SIZE = 260
 
 def predict_image(image):
 
-    # No image uploaded
+    # =================================================
+    # No Image Uploaded
+    # =================================================
+
     if image is None:
         return {
-            "Please Upload an Image": 1.0
+            "⚠️ Please Upload an Image": 1.0
         }
 
-    # Convert image
+    # =================================================
+    # Image Processing
+    # =================================================
+
     image = image.convert("RGB")
 
-    # Resize
     image = image.resize((IMG_SIZE, IMG_SIZE))
 
-    # Convert to array
     image_array = np.array(image)
 
-    # Expand dimensions
     image_input = np.expand_dims(image_array, axis=0)
 
-    # Preprocess
     image_input = tf.keras.applications.efficientnet_v2.preprocess_input(
         image_input
     )
 
-    # Predict
+    # =================================================
+    # Prediction
+    # =================================================
+
     predictions = model.predict(image_input, verbose=0)[0]
 
-    # Get highest confidence
     max_confidence = float(np.max(predictions))
 
-    # Predicted class index
     predicted_index = np.argmax(predictions)
 
-    # Predicted class name
     predicted_class = class_names[predicted_index]
 
     # =================================================
     # Validation Logic
     # =================================================
 
-    # If confidence below 50%
     if max_confidence < 0.50:
 
         return {
-            "❌ Not an E-Waste Image / Blurry / Multiple Items": 1.0
+            "❌ Not E-Waste / Blurry / Multiple Items": 1.0
         }
 
     # =================================================
     # Valid Prediction
     # =================================================
 
-    confidences = {
-        predicted_class: max_confidence
+    return {
+        f"✅ {predicted_class}": round(max_confidence, 3)
     }
-
-    return confidences
 
 
 # =====================================================
@@ -98,9 +107,14 @@ def predict_image(image):
 # =====================================================
 
 custom_css = """
+
 body {
     background: #0f172a;
 }
+
+/* ================================================== */
+/* Main Container */
+/* ================================================== */
 
 .gradio-container {
     max-width: 1300px !important;
@@ -115,7 +129,7 @@ body {
 
 .main-title {
     text-align: center;
-    font-size: 42px;
+    font-size: 44px;
     font-weight: 800;
     color: white;
     margin-bottom: 10px;
@@ -163,6 +177,7 @@ button {
     color: #94a3b8;
     font-size: 14px;
 }
+
 """
 
 # =====================================================
@@ -195,7 +210,7 @@ with gr.Blocks(
     )
 
     # =================================================
-    # Upload + Prediction Results
+    # Upload + Prediction
     # =================================================
 
     with gr.Row(equal_height=True):
@@ -230,7 +245,7 @@ with gr.Blocks(
                 )
 
         # =============================================
-        # Prediction Results
+        # Prediction Section
         # =============================================
 
         with gr.Column(scale=1):
