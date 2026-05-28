@@ -1,22 +1,18 @@
-# =====================================================
-# Imports
-# =====================================================
-
-import os
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
 import gradio as gr
 import tensorflow as tf
 import numpy as np
-
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 
 # =====================================================
 # Load Model
 # =====================================================
 
+# IMPORTANT:
+# Use the CLEAN deployment model
+# NOT the original training model
+
 model = load_model(
-    "ewaste_efficientnetv2b2.keras",
+    "ewaste_deployment.keras",
     compile=False,
     safe_mode=False
 )
@@ -46,60 +42,34 @@ IMG_SIZE = 260
 
 def predict_image(image):
 
-    # =================================================
-    # No Image Uploaded
-    # =================================================
-
     if image is None:
-        return {
-            "⚠️ Please Upload an Image": 1.0
-        }
+        return {"Please Upload an Image": 1.0}
 
-    # =================================================
-    # Image Processing
-    # =================================================
-
+    # Convert to RGB
     image = image.convert("RGB")
 
+    # Resize
     image = image.resize((IMG_SIZE, IMG_SIZE))
 
-    image_array = np.array(image)
+    # Convert to numpy
+    image = np.array(image).astype("float32")
 
-    image_input = np.expand_dims(image_array, axis=0)
+    # Expand dims
+    image = np.expand_dims(image, axis=0)
 
-    image_input = tf.keras.applications.efficientnet_v2.preprocess_input(
-        image_input
-    )
+    # Preprocess
+    image = tf.keras.applications.efficientnet_v2.preprocess_input(image)
 
-    # =================================================
-    # Prediction
-    # =================================================
+    # Predict
+    predictions = model.predict(image, verbose=0)[0]
 
-    predictions = model.predict(image_input, verbose=0)[0]
-
-    max_confidence = float(np.max(predictions))
-
-    predicted_index = np.argmax(predictions)
-
-    predicted_class = class_names[predicted_index]
-
-    # =================================================
-    # Validation Logic
-    # =================================================
-
-    if max_confidence < 0.50:
-
-        return {
-            "❌ Not E-Waste / Blurry / Multiple Items": 1.0
-        }
-
-    # =================================================
-    # Valid Prediction
-    # =================================================
-
-    return {
-        f"✅ {predicted_class}": round(max_confidence, 3)
+    # Convert to dictionary
+    confidences = {
+        class_names[i]: float(predictions[i])
+        for i in range(len(class_names))
     }
+
+    return confidences
 
 
 # =====================================================
@@ -107,29 +77,20 @@ def predict_image(image):
 # =====================================================
 
 custom_css = """
-
 body {
     background: #0f172a;
 }
 
-/* ================================================== */
-/* Main Container */
-/* ================================================== */
-
 .gradio-container {
-    max-width: 1300px !important;
+    max-width: 1250px !important;
     margin: auto;
     padding-top: 20px;
     font-family: Arial, sans-serif;
 }
 
-/* ================================================== */
-/* Header */
-/* ================================================== */
-
 .main-title {
     text-align: center;
-    font-size: 44px;
+    font-size: 42px;
     font-weight: 800;
     color: white;
     margin-bottom: 10px;
@@ -139,26 +100,17 @@ body {
     text-align: center;
     color: #cbd5e1;
     font-size: 18px;
-    margin-bottom: 35px;
+    margin-bottom: 30px;
 }
-
-/* ================================================== */
-/* Cards */
-/* ================================================== */
 
 .upload-card,
 .result-card {
     background: #111827 !important;
-    border-radius: 22px !important;
+    border-radius: 20px !important;
     padding: 20px !important;
-    min-height: 560px !important;
+    min-height: 520px !important;
     height: 100%;
-    border: 1px solid #1e293b;
 }
-
-/* ================================================== */
-/* Buttons */
-/* ================================================== */
 
 button {
     border-radius: 14px !important;
@@ -167,17 +119,12 @@ button {
     height: 52px;
 }
 
-/* ================================================== */
-/* Footer */
-/* ================================================== */
-
 .footer-text {
     text-align: center;
     margin-top: 25px;
     color: #94a3b8;
     font-size: 14px;
 }
-
 """
 
 # =====================================================
@@ -210,7 +157,68 @@ with gr.Blocks(
     )
 
     # =================================================
-    # Upload + Prediction
+    # Supported Classes
+    # =================================================
+
+    gr.HTML(
+        """
+        <div style="
+            background:#111827;
+            padding:22px;
+            border-radius:20px;
+            margin-bottom:30px;
+            color:white;
+        ">
+
+        <h2 style="margin-bottom:18px;">
+            📦 Supported Classes
+        </h2>
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            font-size:17px;
+            font-weight:500;
+            margin-bottom:15px;
+            flex-wrap:wrap;
+            gap:10px;
+        ">
+            <span>🔋 Battery</span>
+            <span>•</span>
+            <span>⌨️ Keyboard</span>
+            <span>•</span>
+            <span>📡 Microwave</span>
+            <span>•</span>
+            <span>📱 Mobile</span>
+            <span>•</span>
+            <span>🖱️ Mouse</span>
+        </div>
+
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            font-size:17px;
+            font-weight:500;
+            flex-wrap:wrap;
+            gap:10px;
+        ">
+            <span>💻 PCB</span>
+            <span>•</span>
+            <span>🎵 Player</span>
+            <span>•</span>
+            <span>🖨️ Printer</span>
+            <span>•</span>
+            <span>📺 Television</span>
+            <span>•</span>
+            <span>🧺 Washing Machine</span>
+        </div>
+
+        </div>
+        """
+    )
+
+    # =================================================
+    # Upload + Prediction Results
     # =================================================
 
     with gr.Row(equal_height=True):
@@ -227,7 +235,7 @@ with gr.Blocks(
                     """
                     <div style="
                         color:white;
-                        font-size:22px;
+                        font-size:20px;
                         font-weight:700;
                         margin-bottom:18px;
                     ">
@@ -240,12 +248,12 @@ with gr.Blocks(
                     type="pil",
                     sources=["upload", "clipboard", "webcam"],
                     image_mode="RGB",
-                    height=430,
+                    height=420,
                     container=False
                 )
 
         # =============================================
-        # Prediction Section
+        # Prediction Results
         # =============================================
 
         with gr.Column(scale=1):
@@ -256,7 +264,7 @@ with gr.Blocks(
                     """
                     <div style="
                         color:white;
-                        font-size:22px;
+                        font-size:20px;
                         font-weight:700;
                         margin-bottom:18px;
                     ">
@@ -266,14 +274,13 @@ with gr.Blocks(
                 )
 
                 output = gr.Label(
-                    num_top_classes=1,
+                    num_top_classes=5,
                     container=False
                 )
 
-                # Empty spacing
                 gr.HTML(
                     """
-                    <div style="height:330px;"></div>
+                    <div style="height:320px;"></div>
                     """
                 )
 
@@ -319,7 +326,4 @@ with gr.Blocks(
 # Launch
 # =====================================================
 
-demo.launch(
-    server_name="0.0.0.0",
-    server_port=7860
-)
+demo.launch(server_name="0.0.0.0", server_port=7860)
