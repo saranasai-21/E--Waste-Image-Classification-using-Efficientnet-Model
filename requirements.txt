@@ -1,5 +1,0 @@
-gradio
-tensorflow
-numpy
-pillow
-h5py
