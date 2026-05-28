@@ -3,7 +3,9 @@ keras==3.3.3
 gradio==4.44.1
 huggingface_hub==0.25.2
 numpy==1.26.4
-pillow
-h5py
+h5py==3.11.0
+protobuf==4.25.3
+pillow==10.4.0
 fastapi==0.112.2
 starlette==0.38.2
+uvicorn==0.30.6
