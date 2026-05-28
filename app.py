@@ -1,23 +1,22 @@
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 import gradio as gr
 import tensorflow as tf
+from tensorflow import keras
+from keras import mixed_precision
 import numpy as np
-from tensorflow.keras.models import load_model
+from PIL import Image
 
-# =====================================================
-# Load Original Model
-# =====================================================
+# =========================
+# MIXED PRECISION POLICY
+# =========================
+mixed_precision.set_global_policy("mixed_float16")
 
-model = load_model(
-    "ewaste_efficientnetv2b2.keras",
-    compile=False,
-    safe_mode=False
-)
-
-# =====================================================
-# Class Names
-# =====================================================
-
-class_names = [
+# =========================
+# CLASS NAMES
+# =========================
+CLASS_NAMES = [
     "Battery",
     "Keyboard",
     "Microwave",
@@ -30,295 +29,278 @@ class_names = [
     "Washing Machine"
 ]
 
+# =========================
+# LOAD MODEL
+# =========================
+MODEL_PATH = "best_model.keras"
+
+model = keras.models.load_model(
+    MODEL_PATH,
+    compile=False
+)
+
+# =========================
+# IMAGE SIZE
+# =========================
 IMG_SIZE = 260
 
-# =====================================================
-# Prediction Function
-# =====================================================
-
+# =========================
+# PREDICTION FUNCTION
+# =========================
 def predict_image(image):
 
     if image is None:
-        return {"Please Upload an Image": 1.0}
+        return None, "Please upload an image."
 
-    # Convert image to RGB
-    image = image.convert("RGB")
+    try:
+        # Convert to RGB
+        image = image.convert("RGB")
 
-    # Resize image
-    image = image.resize((IMG_SIZE, IMG_SIZE))
+        # Resize
+        image = image.resize((IMG_SIZE, IMG_SIZE))
 
-    # Convert to numpy
-    image = np.array(image).astype("float32")
+        # Convert to numpy
+        img_array = np.array(image)
 
-    # Expand dimensions
-    image = np.expand_dims(image, axis=0)
+        # Expand dims
+        img_array = np.expand_dims(img_array, axis=0)
 
-    # Preprocess
-    image = tf.keras.applications.efficientnet_v2.preprocess_input(image)
+        # Predict
+        predictions = model.predict(img_array, verbose=0)
 
-    # Predict
-    predictions = model.predict(image, verbose=0)[0]
+        # Convert float16 -> float32
+        predictions = predictions.astype(np.float32)
 
-    # Convert predictions to dictionary
-    confidences = {
-        class_names[i]: float(predictions[i])
-        for i in range(len(class_names))
-    }
+        # Get class index
+        predicted_index = np.argmax(predictions)
 
-    return confidences
+        # Get confidence
+        confidence = float(np.max(predictions)) * 100
 
+        # Get label
+        predicted_label = CLASS_NAMES[predicted_index]
 
-# =====================================================
-# Custom CSS
-# =====================================================
+        # Probabilities dictionary
+        probs = {
+            CLASS_NAMES[i]: float(predictions[0][i])
+            for i in range(len(CLASS_NAMES))
+        }
 
+        result_text = f"""
+✅ Prediction: {predicted_label}
+
+🎯 Confidence: {confidence:.2f}%
+"""
+
+        return probs, result_text
+
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+
+# =========================
+# CUSTOM CSS
+# =========================
 custom_css = """
 body {
     background: #0f172a;
 }
 
 .gradio-container {
-    max-width: 1250px !important;
+    max-width: 1400px !important;
     margin: auto;
-    padding-top: 20px;
-    font-family: Arial, sans-serif;
 }
 
 .main-title {
     text-align: center;
     font-size: 42px;
-    font-weight: 800;
+    font-weight: bold;
     color: white;
     margin-bottom: 10px;
 }
 
-.sub-title {
+.subtitle {
     text-align: center;
-    color: #cbd5e1;
     font-size: 18px;
+    color: #cbd5e1;
     margin-bottom: 30px;
 }
 
-.upload-card,
-.result-card {
-    background: #111827 !important;
-    border-radius: 20px !important;
-    padding: 20px !important;
-    min-height: 520px !important;
-    height: 100%;
+.support-box {
+    background: #111827;
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px solid #374151;
 }
 
-button {
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    font-size: 16px !important;
-    height: 52px;
-}
-
-.footer-text {
+.support-title {
     text-align: center;
-    margin-top: 25px;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.class-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+}
+
+.class-item {
+    background: #1e293b;
+    padding: 12px;
+    border-radius: 12px;
+    text-align: center;
+    color: white;
+    font-weight: bold;
+    border: 1px solid #334155;
+}
+
+.upload-box {
+    background: #111827;
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px solid #374151;
+}
+
+.result-box {
+    background: #111827;
+    padding: 20px;
+    border-radius: 18px;
+    border: 1px solid #374151;
+}
+
+.footer {
+    text-align: center;
     color: #94a3b8;
-    font-size: 14px;
+    margin-top: 20px;
 }
 """
 
-# =====================================================
+# =========================
 # UI
-# =====================================================
+# =========================
+with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
 
-with gr.Blocks(
-    title="AI E-Waste Classifier",
-    theme=gr.themes.Soft(
-        primary_hue="indigo",
-        secondary_hue="slate"
-    ),
-    css=custom_css
-) as demo:
+    gr.HTML("""
+    <div class="main-title">
+        ♻️ E-Waste Image Classifier
+    </div>
 
-    # =================================================
-    # Header
-    # =================================================
+    <div class="subtitle">
+        Upload an E-Waste image and classify it using EfficientNetV2B2
+    </div>
+    """)
 
-    gr.Markdown(
-        """
-        <div class="main-title">
-            ♻️ AI E-Waste Classifier
+    # =========================
+    # SUPPORTED CLASSES
+    # =========================
+    gr.HTML("""
+    <div class="support-box">
+        <div class="support-title">
+            Supported Classes
         </div>
 
-        <div class="sub-title">
-            Upload an electronic waste image and classify it using EfficientNetV2B2
+        <div class="class-grid">
+            <div class="class-item">🔋 Battery</div>
+            <div class="class-item">⌨️ Keyboard</div>
+            <div class="class-item">🍲 Microwave</div>
+            <div class="class-item">📱 Mobile</div>
+            <div class="class-item">🖱️ Mouse</div>
+
+            <div class="class-item">💻 PCB</div>
+            <div class="class-item">🎵 Player</div>
+            <div class="class-item">🖨️ Printer</div>
+            <div class="class-item">📺 Television</div>
+            <div class="class-item">🧺 Washing Machine</div>
         </div>
-        """
-    )
+    </div>
+    """)
 
-    # =================================================
-    # Supported Classes
-    # =================================================
+    gr.Markdown("")
 
-    gr.HTML(
-        """
-        <div style="
-            background:#111827;
-            padding:22px;
-            border-radius:20px;
-            margin-bottom:30px;
-            color:white;
-        ">
+    # =========================
+    # UPLOAD + RESULT SIDE BY SIDE
+    # =========================
+    with gr.Row():
 
-        <h2 style="margin-bottom:18px;">
-            📦 Supported Classes
-        </h2>
+        with gr.Column():
 
-        <div style="
-            display:flex;
-            justify-content:space-between;
-            font-size:17px;
-            font-weight:500;
-            margin-bottom:15px;
-            flex-wrap:wrap;
-            gap:10px;
-        ">
-            <span>🔋 Battery</span>
-            <span>•</span>
-            <span>⌨️ Keyboard</span>
-            <span>•</span>
-            <span>📡 Microwave</span>
-            <span>•</span>
-            <span>📱 Mobile</span>
-            <span>•</span>
-            <span>🖱️ Mouse</span>
-        </div>
+            gr.HTML("""
+            <div class="upload-box">
+                <h2 style="color:white;text-align:center;">
+                    Upload Image
+                </h2>
+            </div>
+            """)
 
-        <div style="
-            display:flex;
-            justify-content:space-between;
-            font-size:17px;
-            font-weight:500;
-            flex-wrap:wrap;
-            gap:10px;
-        ">
-            <span>💻 PCB</span>
-            <span>•</span>
-            <span>🎵 Player</span>
-            <span>•</span>
-            <span>🖨️ Printer</span>
-            <span>•</span>
-            <span>📺 Television</span>
-            <span>•</span>
-            <span>🧺 Washing Machine</span>
-        </div>
+            image_input = gr.Image(
+                type="pil",
+                label="Upload E-Waste Image",
+                height=400
+            )
 
-        </div>
-        """
-    )
+        with gr.Column():
 
-    # =================================================
-    # Upload + Prediction Results
-    # =================================================
+            gr.HTML("""
+            <div class="result-box">
+                <h2 style="color:white;text-align:center;">
+                    Prediction Results
+                </h2>
+            </div>
+            """)
 
-    with gr.Row(equal_height=True):
+            label_output = gr.Label(
+                num_top_classes=10,
+                label="Class Probabilities"
+            )
 
-        # Upload Section
+            text_output = gr.Textbox(
+                label="Prediction",
+                lines=5
+            )
 
-        with gr.Column(scale=1):
-
-            with gr.Group(elem_classes="upload-card"):
-
-                gr.Markdown(
-                    """
-                    <div style="
-                        color:white;
-                        font-size:20px;
-                        font-weight:700;
-                        margin-bottom:18px;
-                    ">
-                        📤 Upload E-Waste Image
-                    </div>
-                    """
-                )
-
-                image_input = gr.Image(
-                    type="pil",
-                    sources=["upload", "clipboard", "webcam"],
-                    image_mode="RGB",
-                    height=420,
-                    container=False
-                )
-
-        # Prediction Results
-
-        with gr.Column(scale=1):
-
-            with gr.Group(elem_classes="result-card"):
-
-                gr.Markdown(
-                    """
-                    <div style="
-                        color:white;
-                        font-size:20px;
-                        font-weight:700;
-                        margin-bottom:18px;
-                    ">
-                        📊 Prediction Results
-                    </div>
-                    """
-                )
-
-                output = gr.Label(
-                    num_top_classes=5,
-                    container=False
-                )
-
-                gr.HTML(
-                    """
-                    <div style="height:320px;"></div>
-                    """
-                )
-
-    # =================================================
-    # Buttons
-    # =================================================
-
+    # =========================
+    # BUTTONS
+    # =========================
     with gr.Row():
 
         predict_btn = gr.Button(
-            "🔍 Predict",
+            "🚀 Predict",
             variant="primary"
         )
 
-        clear_btn = gr.ClearButton(
-            [image_input, output],
-            value="🗑 Clear"
+        clear_btn = gr.Button(
+            "🗑️ Clear"
         )
 
-    # =================================================
-    # Prediction Event
-    # =================================================
-
+    # =========================
+    # BUTTON ACTIONS
+    # =========================
     predict_btn.click(
         fn=predict_image,
         inputs=image_input,
-        outputs=output
+        outputs=[label_output, text_output]
     )
 
-    # =================================================
-    # Footer
-    # =================================================
-
-    gr.Markdown(
-        """
-        <div class="footer-text">
-            Built with TensorFlow • EfficientNetV2B2 • Gradio
-        </div>
-        """
+    clear_btn.click(
+        fn=lambda: (None, None, ""),
+        outputs=[image_input, label_output, text_output]
     )
 
-# =====================================================
-# Launch
-# =====================================================
+    # =========================
+    # FOOTER
+    # =========================
+    gr.HTML("""
+    <div class="footer">
+        Built with TensorFlow, Keras & Gradio
+    </div>
+    """)
 
+# =========================
+# LAUNCH
+# =========================
 demo.launch(
     server_name="0.0.0.0",
-    server_port=7860
+    server_port=int(os.environ.get("PORT", 7860))
 )
