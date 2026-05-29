@@ -2,6 +2,10 @@
 
 An image classification project that identifies different types of electronic waste using a fine-tuned EfficientNetV2B2 model. The application is deployed on Hugging Face Spaces and provides real-time predictions through an interactive Gradio interface.
 
+## Kaggle Dataset
+
+https://www.kaggle.com/datasets/akshat103/e-waste-image-dataset
+
 ## Live Webapp
 
 🔗 Hugging Face Space:
