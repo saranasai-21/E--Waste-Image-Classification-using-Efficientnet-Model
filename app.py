@@ -39,91 +39,59 @@ CLASS_NAMES = [
     "Washing Machine"
 ]
 
-# ==========================================
-# SETTINGS
-# ==========================================
 IMG_SIZE = 260
 
-# ==========================================
 # LOAD MODEL
-# ==========================================
+
 MODEL_PATH = "ewaste_efficientnetv2b2.keras"
 
 print("Loading model...")
 
-model = keras.models.load_model(
-    MODEL_PATH,
-    compile=False,
-    safe_mode=False
-)
-
+model = keras.models.load_model(MODEL_PATH, compile=False, safe_mode=False)
 print("Model loaded successfully")
 print("Input Shape:", model.input_shape)
 print("Output Shape:", model.output_shape)
 
-# ==========================================
 # PREDICTION FUNCTION
-# ==========================================
-def predict_image(image):
 
+def predict_image(image):
     if image is None:
         return {}, "Please upload an image."
-
     try:
-
-        # Convert image
         image = image.convert("RGB")
 
-        # Resize
         image = image.resize((IMG_SIZE, IMG_SIZE))
 
-        # To numpy
         img_array = np.array(image).astype(np.float32)
 
-        # Batch dimension
         img_array = np.expand_dims(img_array, axis=0)
 
         # EfficientNetV2 preprocessing
         img_array = preprocess_input(img_array)
 
-        # Predict
         predictions = model.predict(img_array, verbose=0)
 
         predictions = np.array(predictions).astype(np.float32)
 
-        print("\n====================")
         print("Prediction Vector:")
         print(predictions)
-        print("====================\n")
 
         # NaN protection
         if np.isnan(predictions).any():
             return {}, "Model returned invalid predictions (NaN)."
 
         predicted_index = int(np.argmax(predictions[0]))
-
         confidence = float(predictions[0][predicted_index]) * 100
-
         predicted_label = CLASS_NAMES[predicted_index]
-
-        probs = {
-            CLASS_NAMES[i]: float(predictions[0][i])
-            for i in range(len(CLASS_NAMES))
-        }
-
+        probs = {CLASS_NAMES[i]: float(predictions[0][i]) for i in range(len(CLASS_NAMES))}
         result_text = f"""
 ✅ Prediction: {predicted_label}
-
 🎯 Confidence: {confidence:.2f}%
 """
-
         return probs, result_text
-
     except Exception as e:
-
         import traceback
         traceback.print_exc()
-
         return {}, f"Error: {str(e)}"
 
 # ==========================================
@@ -231,11 +199,9 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
     """)
 
     gr.Markdown("")
-
     with gr.Row():
-
         with gr.Column():
-
+    
             gr.HTML("""
             <div class="upload-box">
                 <h2 style="color:white;text-align:center;">
@@ -244,11 +210,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
             </div>
             """)
 
-            image_input = gr.Image(
-                type="pil",
-                label="Upload E-Waste Image",
-                height=400
-            )
+            image_input = gr.Image(type="pil", label="Upload E-Waste Image", height=400)
 
         with gr.Column():
 
